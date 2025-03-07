@@ -1,4 +1,4 @@
-from app.cache import get_cached_data, set_cached_data
+from app.cache import get_cached_data, set_cached_data, store_search_result
 import requests
 from fastapi import HTTPException
 
@@ -6,17 +6,29 @@ from fastapi import HTTPException
 def scrape_google_autocomplete(query: str):
     cache_key = f"google:{query}"
     cached_result = get_cached_data(cache_key)
+
     if cached_result:
-        return eval(cached_result)
+        print(f"🔹 Returning Cached Data for {query}")
+        stored_result = eval(cached_result)  # Convert string back to list
+
+        # Ensure the cached data is also stored in the results history
+        store_search_result(query, stored_result)
+
+        return stored_result
+
+    print(f"🔸 Fetching Fresh Data for {query}")
 
     url = f"https://www.google.com/complete/search?q={query}&client=firefox"
 
     try:
         response = requests.get(url, timeout=5)
-        response.raise_for_status()  # Raise exception for 4xx/5xx errors
+        response.raise_for_status()
 
         suggestions = response.json()[1]
+
+        print(f"✅ Storing Search Result for {query}")
         set_cached_data(cache_key, suggestions)
+        store_search_result(query, suggestions)
         return suggestions
     except requests.exceptions.Timeout:
         raise HTTPException(status_code=408, detail="Request to Google timed out.")
