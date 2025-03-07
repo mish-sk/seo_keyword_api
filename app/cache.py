@@ -3,37 +3,42 @@ import os
 import redis
 
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+REDIS_URL = os.getenv("REDIS_URL")
 
-redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
-
-try:
-    redis_client = redis.from_url(REDIS_URL, decode_responses=True)
-    redis_client.ping()
-    print("✅ Connected to Redis:", REDIS_URL)
-except redis.exceptions.ConnectionError:
-    redis_client = None
-    print("⚠️ Redis is not available, caching is disabled.")
+if REDIS_URL:
+    try:
+        redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+        redis_client.ping()  # Check if Redis is available
+        print(f"✅ Connected to Redis: {REDIS_URL}")
+    except redis.exceptions.ConnectionError:
+        redis_client = None  # Disable Redis if not available
+        print("⚠️ Redis connection failed. Caching is disabled.")
+else:
+    redis_client = None  # Disable Redis if REDIS_URL is not set
+    print("⚠️ No REDIS_URL provided. Caching is disabled.")
 
 
 def get_cached_data(key: str):
-    """Retrieve cached data from Redis."""
-    return redis_client.get(key)
+    """Retrieve cached data from Redis, or return None if Redis is unavailable."""
+    if redis_client:
+        return redis_client.get(key)
+    return None  # No caching if Redis is disabled
 
 
 def set_cached_data(key: str, value: list, expire_time: int = 3600):
-    """Store data in Redis with an expiration time (default: 1 hour)."""
-    redis_client.setex(key, expire_time, str(value))
+    """Store data in Redis if available."""
+    if redis_client:
+        redis_client.setex(key, expire_time, str(value))
 
 
 def get_last_search(query: str):
     """Retrieve the last stored search result from Redis."""
-    key = f"result:{query}"
-    return redis_client.get(key)
+    if redis_client:
+        return redis_client.get(f"result:{query}")
+    return None  # No result storage if Redis is disabled
 
 
 def store_search_result(query: str, result: list):
     """Store the last search result in Redis."""
-    key = f"result:{query}"
-    redis_client.setex(key, 3600, str(result))  # Store for 1 hour
-    print(f"✅ Stored in Redis: {key} -> {result}")  # Debugging output
+    if redis_client:
+        redis_client.setex(f"result:{query}", 3600, str(result))
