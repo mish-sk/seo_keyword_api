@@ -1,7 +1,19 @@
+import os
+
 import redis
 
-# Connect to Redis
+
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+
 redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
+
+try:
+    redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+    redis_client.ping()
+    print("✅ Connected to Redis:", REDIS_URL)
+except redis.exceptions.ConnectionError:
+    redis_client = None
+    print("⚠️ Redis is not available, caching is disabled.")
 
 
 def get_cached_data(key: str):
